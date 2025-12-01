@@ -644,6 +644,207 @@ Hệ thống hiện tại tồn tại các lỗ hổng nghiêm trọng về cấ
 
 \section{Monitoring và Observability}
 
+% \section{Task 5 -- Monitoring and Observability}
+
+\subsection{Mục tiêu}
+
+Trong Task 5, nhóm tập trung quan sát và đánh giá hệ thống đã xây dựng ở các task trước (container API trên Machine A giao tiếp với container worker trên Machine B bằng \textbf{Method 1 -- port mapping}). Mục tiêu chính gồm:
+
+\begin{itemize}
+    \item Theo dõi \textbf{metrics của container} (CPU, RAM, network I/O).
+    \item Theo dõi \textbf{traffic mạng} giữa API và worker.
+    \item Trực quan hoá ít nhất \textbf{hai loại dữ liệu}.
+    \item Phát hiện tối thiểu \textbf{một vấn đề/bottleneck} dựa trên kết quả monitoring.
+\end{itemize}
+
+Trong phạm vi bài lab, nhóm lựa chọn kết hợp hai nhóm công cụ nhẹ, dễ triển khai:
+
+\begin{itemize}
+    \item \textbf{Docker stats / Docker logs}: theo dõi resource usage và log ứng dụng ở mức container.
+    \item \textbf{tcpdump + Wireshark}: thu thập và phân tích traffic mạng giữa hai máy/container.
+\end{itemize}
+
+Cách làm này phù hợp với môi trường thí nghiệm nhỏ, không cần dựng full stack Prometheus + Grafana nhưng vẫn đáp ứng yêu cầu monitoring và quan sát hệ thống.
+
+%--------------------------------------------------------
+\subsection{Kiến trúc và công cụ giám sát}
+
+Hệ thống được giám sát trong Task 5 gồm:
+
+\begin{itemize}
+    \item \textbf{Machine A}:
+    \begin{itemize}
+        \item Container \texttt{api-gateway}, publish cổng \texttt{8000}.
+        \item Nhận request từ client và gửi HTTP request tới worker trên Machine B.
+    \end{itemize}
+    \item \textbf{Machine B}:
+    \begin{itemize}
+        \item Container \texttt{ml-worker}, publish cổng \texttt{5000}.
+        \item Xử lý request (giả lập suy luận mô hình) và trả kết quả cho API.
+    \end{itemize}
+\end{itemize}
+
+Các công cụ monitoring được sử dụng cụ thể như sau:
+
+\paragraph{Docker stats / Docker logs}
+
+Trong thời gian chạy benchmark, nhóm sử dụng các lệnh:
+
+\begin{verbatim}
+docker stats api-gateway ml-worker
+docker logs -f api-gateway
+docker logs -f ml-worker
+\end{verbatim}
+
+\begin{itemize}
+    \item \texttt{docker stats} cung cấp các chỉ số:
+    \begin{itemize}
+        \item CPU\% theo thời gian.
+        \item Memory usage của từng container.
+        \item Network I/O (bytes sent/received).
+    \end{itemize}
+    \item \texttt{docker logs} hỗ trợ:
+    \begin{itemize}
+        \item Ghi nhận lỗi HTTP (timeout, mã lỗi 5xx).
+        \item Kiểm tra thời gian xử lý mỗi request (nếu ứng dụng có log).
+    \end{itemize}
+\end{itemize}
+
+\paragraph{tcpdump + Wireshark}
+
+Để quan sát traffic mạng khi tải tăng, nhóm sử dụng \texttt{tcpdump} trên host:
+
+\begin{verbatim}
+sudo tcpdump -i eth0 port 8000 -w method1_traffic.pcap
+\end{verbatim}
+
+File \texttt{.pcap} thu được được mở bằng \textbf{Wireshark} để:
+
+\begin{itemize}
+    \item Xem số lượng gói tin HTTP/TCP theo thời gian khi chạy benchmark.
+    \item Quan sát round-trip time (RTT) của các HTTP request mẫu.
+    \item Kiểm tra có gói tin bị \textit{retransmit} hoặc \textit{RST/FIN} bất thường hay không.
+\end{itemize}
+
+Trong báo cáo, nhóm chèn các hình minh hoạ:
+
+\begin{itemize}
+    \item Hình 5.1: Biểu đồ CPU và Net I/O của hai container từ \texttt{docker stats}.
+    \item Hình 5.2: Biểu đồ lưu lượng HTTP theo thời gian trong Wireshark (filter theo \texttt{tcp.port == 8000} hoặc \texttt{5000}).
+\end{itemize}
+
+%--------------------------------------------------------
+\subsection{Dữ liệu được quan sát và trực quan hoá}
+
+Nhóm tập trung vào \textbf{hai loại dữ liệu chính} để trực quan hoá và phân tích:
+
+\subsubsection{Resource metrics của container}
+
+Từ \texttt{docker stats}, trong khi chạy công cụ benchmark (ví dụ \texttt{wrk} với \texttt{2 threads}, \texttt{20 connections}, thời gian khoảng \texttt{30s}), nhóm quan sát được:
+
+\begin{itemize}
+    \item \textbf{Container \texttt{api-gateway}}:
+    \begin{itemize}
+        \item CPU dao động quanh \textit{X--Y\%} khi số lượng request đồng thời tăng.
+        \item Memory ổn định quanh \textit{M} MB, không có xu hướng tăng dần (không phát hiện dấu hiệu memory leak).
+        \item Net I/O tăng đều theo thời gian, phù hợp với số lượng request/response được sinh ra.
+    \end{itemize}
+    \item \textbf{Container \texttt{ml-worker}}:
+    \begin{itemize}
+        \item CPU thường cao hơn \texttt{api-gateway} do chịu tải xử lý chính, có thời điểm lên tới khoảng \textit{E--F\%} khi tăng concurrency.
+        \item Memory ổn định ở mức \textit{N} MB.
+        \item Net I/O phản ánh pattern nhận request từ API (RX) và trả kết quả (TX).
+    \end{itemize}
+\end{itemize}
+
+Các số liệu trên được chụp màn hình và trình bày trong Hình 5.1, giúp so sánh trực quan mức độ sử dụng tài nguyên giữa API và worker.
+
+\subsubsection{Network traffic và latency ở tầng gói tin}
+
+Từ file \texttt{method1\_traffic.pcap} (mở bằng Wireshark), nhóm quan sát:
+
+\begin{itemize}
+    \item Số lượng gói tin TCP/HTTP theo thời gian trong giai đoạn chạy benchmark.
+    \item Thời gian đáp ứng (khoảng thời gian giữa request và response) cho một số request mẫu.
+    \item Sự xuất hiện (hoặc không xuất hiện) của các gói \textit{TCP Retransmission}, \textit{Duplicate ACK}, \textit{RST}, v.v.
+\end{itemize}
+
+Biểu đồ traffic lọc theo \texttt{tcp.port == 8000} cho thấy:
+
+\begin{itemize}
+    \item Lưu lượng tăng rõ rệt trong khoảng thời gian benchmark.
+    \item Không có burst bất thường ngoài thời gian test; traffic tương đối đều và ổn định.
+\end{itemize}
+
+Các hình này được trình bày dưới dạng dashboard/biểu đồ (Hình 5.2), là minh chứng trực quan cho hành vi của hệ thống dưới tải.
+
+%--------------------------------------------------------
+\subsection{Vấn đề được phát hiện nhờ monitoring}
+
+Bằng việc kết hợp \texttt{docker stats}, \texttt{docker logs} và phân tích Wireshark, nhóm phát hiện một bottleneck quan trọng khi tăng tải:
+
+\begin{itemize}
+    \item Khi tăng mức độ concurrency (ví dụ từ 20 lên 50 request đồng thời), metrics cho thấy:
+    \begin{itemize}
+        \item CPU của container \texttt{ml-worker} thường xuyên chạm ngưỡng cao (xấp xỉ \textit{E--F\%}), trong khi \texttt{api-gateway} vẫn còn dư tài nguyên.
+        \item Latency trung bình và P95 từ công cụ benchmark tăng đáng kể (ví dụ P95 tăng từ khoảng \textit{L\_1 ms} lên \textit{L\_2 ms}).
+        \item Trong log xuất hiện một số request timeout hoặc lỗi kết nối khi tải cao (nếu có).
+    \end{itemize}
+\end{itemize}
+
+Quan sát song song trong Wireshark:
+
+\begin{itemize}
+    \item Không thấy pattern mất gói (packet loss) hay TCP retransmission đáng kể.
+    \item Phần lớn request đều được gửi/nhận bình thường, nhưng thời gian đáp ứng tăng lên khi \texttt{ml-worker} bị bão hoà CPU.
+\end{itemize}
+
+Từ các quan sát này, nhóm kết luận:
+
+\begin{itemize}
+    \item Bottleneck chính nằm ở \textbf{khả năng xử lý của ứng dụng trong container \texttt{ml-worker}}, không phải do giới hạn của mạng:
+    \begin{itemize}
+        \item Ping giữa hai máy ổn định, không có packet loss đáng kể.
+        \item Wireshark không chỉ ra hiện tượng tắc nghẽn hay lỗi truyền dẫn bất thường.
+    \end{itemize}
+    \item Để mở rộng hệ thống, giải pháp phù hợp không phải là thay đổi phương thức networking, mà là:
+    \begin{itemize}
+        \item Tối ưu logic xử lý trong \texttt{ml-worker}.
+        \item Tăng tài nguyên cho Machine B (CPU/RAM).
+        \item Hoặc scale-out nhiều replica \texttt{ml-worker} kết hợp load balancing.
+    \end{itemize}
+\end{itemize}
+
+%--------------------------------------------------------
+\subsection{Nhận xét và bài học kinh nghiệm}
+
+Qua Task 5, nhóm rút ra một số bài học quan trọng:
+
+\begin{itemize}
+    \item Monitoring không chỉ là “xem CPU cho vui”, mà giúp \textbf{định vị chính xác nguyên nhân} khi hệ thống chậm:
+    \begin{itemize}
+        \item Khi kết hợp CPU, Net I/O, latency và traffic, nhóm có thể tránh phán đoán cảm tính.
+    \end{itemize}
+    \item Các công cụ nhẹ như \texttt{docker stats} / \texttt{docker logs} kết hợp \texttt{tcpdump + Wireshark} đã đủ hữu ích cho một bài lab nhỏ:
+    \begin{itemize}
+        \item Không cần ngay lập tức dựng Prometheus + Grafana nhưng vẫn quan sát được hành vi hệ thống.
+    \end{itemize}
+    \item Việc chụp lại các màn hình (dashboard metrics, biểu đồ traffic) là rất quan trọng:
+    \begin{itemize}
+        \item Minh chứng rằng kết luận được rút ra dựa trên số liệu thực tế.
+        \item Tạo cơ sở để so sánh với các phương thức networking khác (overlay, VPN, message broker, \ldots) ở các task tiếp theo.
+    \end{itemize}
+\end{itemize}
+
+Trong tương lai, khi hệ thống lớn hơn, nhóm có thể nâng cấp stack quan sát lên các giải pháp như Prometheus + Grafana, Netdata hoặc Grafana Loki để:
+
+\begin{itemize}
+    \item Thu thập time series metrics tự động cho nhiều container và nhiều node.
+    \item Xây dựng dashboard tập trung để theo dõi toàn bộ hệ thống.
+    \item Đặt alert khi CPU, latency hoặc error rate vượt ngưỡng, giống cách vận hành hệ thống trong môi trường production.
+\end{itemize}
+
+
 \section{Phản ánh}
 
 Bài tập mạng này đã cung cấp một cái nhìn sâu sắc và toàn diện 
