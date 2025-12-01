@@ -155,30 +155,30 @@
 
 % TITLE PAGE
 \begin{titlepage}
-\begin{center}
-ĐẠI HỌC QUỐC GIA THÀNH PHỐ HỒ CHÍ MINH \\
-TRƯỜNG ĐẠI HỌC BÁCH KHOA \\
-KHOA KHOA HỌC VÀ KỸ THUẬT MÁY TÍNH
-\end{center}
-
-\vspace{1cm}
-
-\begin{figure}[h!]
-\begin{center}
-\includegraphics[width=3cm]{01_logobachkhoasang.png}
-\end{center}
-\end{figure}
-
-\vspace{1cm}
-
-
+    \begin{center}
+        ĐẠI HỌC QUỐC GIA THÀNH PHỐ HỒ CHÍ MINH \\
+        TRƯỜNG ĐẠI HỌC BÁCH KHOA \\
+        KHOA KHOA HỌC VÀ KỸ THUẬT MÁY TÍNH
+    \end{center}
+    
+    \vspace{1cm}
+    
+    \begin{figure}[h!]
+        \begin{center}
+            \includegraphics[width=3cm]{01_logobachkhoasang.png}
+        \end{center}
+    \end{figure}
+    
+    \vspace{1cm}
+    
+    
 \begin{center}
 \begin{tabular}{c}
 \multicolumn{1}{c}{\textbf{{\Large Lớp TN01 - Nhóm 8386}}}\\
 ~~\\
 \hline
 \\
-\multicolumn{1}{l}{\textbf{{\Large Bài tập nhóm tuần 1 - bài 3}}}\\
+\multicolumn{1}{l}{\textbf{{\Large Bài tập nhóm tuần 4 - bài 1}}}\\
 \\
 \textbf{\textit{{\Huge Mạng máy tính (CO3094)}}}\\
 \\
@@ -248,8 +248,227 @@ Trong lĩnh vực thương mại điện tử, các nền tảng lớn như Shop
 
 Bên cạnh các công ty cụ thể, nhiều công nghệ và nền tảng hiện đại cũng dựa mạnh vào Docker. Kubernetes, một hệ thống orchestration phổ biến, sử dụng container (thường là Docker hoặc container runtime tương thích) để quản lý việc deploy, scale và cập nhật ứng dụng trên cụm máy chủ. Các nền tảng CI/CD như GitLab CI, GitHub Actions, CircleCI hay các PaaS như Heroku, OpenShift, nhiều dịch vụ của các nhà cung cấp cloud lớn đều hỗ trợ hoặc dựa trên Docker images để cung cấp môi trường build và chạy ứng dụng tiêu chuẩn, dễ tái sử dụng và dễ mở rộng.
 
-\vspace{0.5cm}
-\noindent
+\section{Phân tích các chế độ mạng của Docker}
+
+Trong phần này, ta sẽ nghiên cứu và đánh giá các chế độ mạng chính của Docker: \textit{bridge}, \textit{host}, \textit{overlay}, \textit{macvlan}, \textit{port mapping}, và \textit{giao tiếp container--container}. Với mỗi chế độ, ta lần lượt trình bày cách hoạt động, trường hợp sử dụng điển hình, ưu điểm và nhược điểm, các lỗi cấu hình thường gặp, và các lưu ý về bảo mật.
+
+\subsection{Bridge Network}
+
+\subsubsection*{Cách hoạt động}
+Khi cài Docker, daemon sẽ tạo một \textit{virtual bridge} mặc định (thường là \texttt{docker0}) trên host, đóng vai trò như một switch ảo lớp 2. Mỗi container được gắn vào bridge sẽ nhận một địa chỉ IP riêng trong subnet của bridge, và Docker sử dụng NAT để cho phép container truy cập ra ngoài mạng (LAN/Internet).
+
+\subsubsection*{Use case điển hình}
+\begin{itemize}
+  \item Môi trường phát triển hoặc thử nghiệm trên một máy, nơi nhiều container (web, API, database) cần giao tiếp nội bộ nhưng chỉ một vài dịch vụ cần được publish ra ngoài.
+  \item Ứng dụng đơn host, microservices chạy trên cùng một máy, không cần multi-host clustering.
+\end{itemize}
+
+\subsubsection*{Ưu điểm và nhược điểm}
+\textbf{Ưu điểm:}
+\begin{itemize}
+  \item Cô lập tương đối tốt giữa các ứng dụng: container trong một bridge network riêng không thấy được container ở network khác.
+  \item Hỗ trợ DNS nội bộ, cho phép container gọi nhau bằng hostname thay vì IP.
+  \item Là chế độ mặc định, cấu hình đơn giản, phù hợp cho người mới dùng Docker.
+\end{itemize}
+
+\textbf{Nhược điểm:}
+\begin{itemize}
+  \item Chỉ hoạt động trong phạm vi một host, không hỗ trợ multi-host.
+  \item Cần thêm một lớp NAT nên việc debug routing/port có thể phức tạp hơn, độ trễ tăng nhẹ.
+\end{itemize}
+
+\subsubsection*{Thách thức cấu hình và troubleshooting}
+\begin{itemize}
+  \item Container không ping được nhau do nằm ở các network khác nhau hoặc subnet trùng với mạng vật lý; cần kiểm tra \texttt{docker network inspect}, IP range và bảng định tuyến.
+  \item Lỗi trùng port khi publish service ra ngoài, container không start được hoặc service không nghe đúng port; cần kiểm tra bằng \texttt{docker ps}, \texttt{docker port}.
+\end{itemize}
+
+\subsubsection*{Lưu ý bảo mật}
+\begin{itemize}
+  \item Container trong cùng một bridge network có thể truy cập lẫn nhau; nếu muốn hạn chế cần dùng iptables hoặc cấu hình để tắt inter-container communication.
+  \item Nên dùng user-defined bridge thay vì default bridge để tách biệt môi trường (dev/test/prod) và quản lý DNS nội bộ tốt hơn.
+\end{itemize}
+
+\subsection{Host Network}
+
+\subsubsection*{Cách hoạt động}
+Ở chế độ \textit{host}, container không có network namespace riêng mà dùng chung stack mạng với host. Container không nhận IP riêng; mọi socket nó mở sẽ gắn trực tiếp vào IP và port của host.
+
+\subsubsection*{Use case điển hình}
+\begin{itemize}
+  \item Ứng dụng cần hiệu năng mạng tối đa, ví dụ xử lý gói tin thời gian thực, hệ thống monitoring, load balancer.
+  \item Các dịch vụ cần sử dụng nhiều port phức tạp, nơi việc cấu hình port mapping sẽ rối rắm.
+\end{itemize}
+
+\subsubsection*{Ưu điểm và nhược điểm}
+\textbf{Ưu điểm:}
+\begin{itemize}
+  \item Không có overhead NAT, hiệu năng mạng gần như chạy trực tiếp trên host.
+  \item Cấu hình đơn giản với các ứng dụng vốn dĩ được thiết kế để chạy trực tiếp trên máy chủ.
+\end{itemize}
+
+\textbf{Nhược điểm:}
+\begin{itemize}
+  \item Mất network isolation: container và host chia sẻ cùng network namespace.
+  \item Dễ xảy ra xung đột port giữa nhiều container hoặc giữa container với process trên host.
+\end{itemize}
+
+\subsubsection*{Thách thức cấu hình và troubleshooting}
+\begin{itemize}
+  \item Lỗi thường gặp là một container dùng host network chiếm port của host, khiến service khác không bind được; cần kiểm tra port đang dùng bằng \texttt{ss} hoặc \texttt{netstat}.
+  \item Một số môi trường ảo hoá hoặc Docker Desktop giới hạn việc dùng host network, có thể gây lỗi khó hiểu.
+\end{itemize}
+
+\subsubsection*{Lưu ý bảo mật}
+\begin{itemize}
+  \item Nếu container bị tấn công, attacker gần như có quyền truy cập mạng giống như trên host, nên rủi ro cao hơn so với bridge.
+  \item Không nên dùng host network cho dịch vụ không tin cậy hoặc môi trường multi-tenant; cần kết hợp firewall, phân quyền user và hardening container.
+\end{itemize}
+
+\subsection{Overlay Network}
+
+\subsubsection*{Cách hoạt động}
+Overlay network sử dụng kỹ thuật encapsulation (thường là VXLAN) để tạo một mạng ảo chạy chồng lên mạng vật lý, kết nối nhiều Docker host với nhau. Khi dùng Docker Swarm, overlay networks được quản lý bởi control plane, cho phép container trên các node khác nhau giao tiếp như thể chúng đang ở cùng một subnet.
+
+\subsubsection*{Use case điển hình}
+\begin{itemize}
+  \item Hệ thống microservices chạy trên nhiều máy vật lý hoặc VM, cần giao tiếp nội bộ mà không muốn tự cấu hình routing phức tạp.
+  \item Môi trường học/lab về hệ thống phân tán hoặc Docker Swarm, nơi cần multi-host networking.
+\end{itemize}
+
+\subsubsection*{Ưu điểm và nhược điểm}
+\textbf{Ưu điểm:}
+\begin{itemize}
+\item Cho phép container trên nhiều host khác nhau giao tiếp dễ dàng, ẩn chi tiết mạng vật lý bên dưới.
+  \item Tích hợp sẵn service discovery trong Swarm, có thể gọi nhau bằng service name.
+  \item Có thể bật mã hoá traffic giữa các node để tăng bảo mật.
+\end{itemize}
+
+\textbf{Nhược điểm:}
+\begin{itemize}
+  \item Cấu hình phức tạp hơn bridge, đòi hỏi bật Swarm mode hoặc dùng orchestrator.
+  \item Encapsulation gây thêm overhead, có thể làm tăng latency và giảm throughput trong một số tình huống.
+\end{itemize}
+
+\subsubsection*{Thách thức cấu hình và troubleshooting}
+\begin{itemize}
+  \item Cần mở đúng các port (2377/TCP, 7946/TCP+UDP, 4789/UDP) giữa các node; nếu firewall chặn, các service sẽ không giao tiếp được dù vẫn hiển thị là chạy.
+  \item Lỗi join swarm sai token, node không tham gia đúng cluster làm cho container trên node đó không thấy được các service khác.
+\end{itemize}
+
+\subsubsection*{Lưu ý bảo mật}
+\begin{itemize}
+  \item Nếu không bật mã hoá, traffic overlay vẫn có thể bị sniff nếu attacker có quyền trên mạng vật lý.
+  \item Cần bảo vệ Swarm join token và quản lý chặt chẽ danh sách node tham gia cluster.
+\end{itemize}
+
+\subsection{MACVLAN Network}
+
+\subsubsection*{Cách hoạt động}
+MACVLAN cho phép gán cho mỗi container một địa chỉ MAC riêng trên interface vật lý (hoặc interface cha), khiến container xuất hiện như một máy riêng trên mạng LAN. Container nhận địa chỉ IP trực tiếp từ subnet của mạng vật lý, không dùng subnet riêng của Docker.
+
+\subsubsection*{Use case điển hình}
+\begin{itemize}
+  \item Khi cần tích hợp container với hệ thống legacy, các thiết bị IoT, router, switch, yêu cầu thiết bị có IP thật trong cùng VLAN.
+  \item Môi trường lab mạng, mô phỏng nhiều host vật lý sử dụng ít máy thật.
+\end{itemize}
+
+\subsubsection*{Ưu điểm và nhược điểm}
+\textbf{Ưu điểm:}
+\begin{itemize}
+  \item Container có IP độc lập trên mạng LAN, không cần NAT, dễ tích hợp với hạ tầng hiện có.
+  \item Phù hợp cho các kịch bản cần broadcast, ARP hay các giao thức lớp 2.
+\end{itemize}
+
+\textbf{Nhược điểm:}
+\begin{itemize}
+  \item Cấu hình phức tạp hơn, phụ thuộc vào cấu hình switch, VLAN và card mạng.
+  \item Host thường không giao tiếp trực tiếp với container MACVLAN nếu không tạo thêm interface MACVLAN trên host và cấu hình route.
+\end{itemize}
+
+\subsubsection*{Thách thức cấu hình và troubleshooting}
+\begin{itemize}
+  \item Dễ gặp lỗi không ping được container từ host do giới hạn của Linux kernel; phải tạo một MACVLAN interface trên host và thiết lập route phù hợp.
+\item Có thể bị chặn bởi các cơ chế \textit{port security} trên switch (giới hạn số MAC trên một port).
+\end{itemize}
+
+\subsubsection*{Lưu ý bảo mật}
+\begin{itemize}
+  \item Container MACVLAN “lộ” trực tiếp ra mạng vật lý; nếu bị tấn công, attacker có thể tấn công các thiết bị trong LAN như từ một host thật.
+  \item Container MACVLAN cũng có thể tham gia hoặc là nạn nhân của tấn công lớp 2 (ARP spoofing, sniffing) nếu mạng không được bảo vệ tốt.
+\end{itemize}
+
+\subsection{Port Mapping (Port Publishing)}
+
+\subsubsection*{Cách hoạt động}
+Port mapping ánh xạ một port trên host (hoặc \texttt{IP:port} trên host) tới port bên trong container, sử dụng NAT và iptables để chuyển hướng traffic. Cú pháp phổ biến là \texttt{-p host\_port:container\_port} hoặc \texttt{-p host\_ip:host\_port:container\_port}.
+
+\subsubsection*{Use case điển hình}
+\begin{itemize}
+  \item Expose dịch vụ web từ container ra ngoài: ví dụ \texttt{-p 8080:80} cho phép truy cập ứng dụng qua \texttt{http://host:8080}.
+  \item Chạy nhiều container cùng loại dịch vụ trên một host, mỗi container dùng một port host khác nhau.
+\end{itemize}
+
+\subsubsection*{Ưu điểm và nhược điểm}
+\textbf{Ưu điểm:}
+\begin{itemize}
+  \item Dễ sử dụng, linh hoạt, là cách phổ biến để “mở” dịch vụ trong container ra ngoài.
+  \item Có thể giới hạn access bằng cách bind vào \texttt{127.0.0.1} hoặc một IP cụ thể của host.
+\end{itemize}
+
+\textbf{Nhược điểm:}
+\begin{itemize}
+  \item Cần quản lý cẩn thận để tránh xung đột port; khi số dịch vụ nhiều, việc nhớ port trở nên khó khăn.
+  \item NAT có thể khiến việc debug mạng phức tạp hơn.
+\end{itemize}
+
+\subsubsection*{Thách thức cấu hình và troubleshooting}
+\begin{itemize}
+  \item Lỗi \textit{port already allocated} khi port host đã được dùng; phải kiểm tra container đang chạy và các dịch vụ trên host.
+  \item Dễ nhầm giữa \texttt{ports} và \texttt{expose} trong Docker Compose: \texttt{ports} publish ra host, \texttt{expose} chỉ dùng nội bộ giữa các container.
+\end{itemize}
+
+\subsubsection*{Lưu ý bảo mật}
+\begin{itemize}
+  \item Mỗi port được publish ra ngoài là một bề mặt tấn công; chỉ nên mở port cần thiết và kết hợp firewall để hạn chế nguồn truy cập.
+  \item Không nên expose trực tiếp database hoặc dịch vụ nội bộ ra Internet; nên dùng reverse proxy, VPN hoặc mạng riêng.
+\end{itemize}
+
+\subsection{Giao tiếp container--container}
+
+\subsubsection*{Cách hoạt động}
+Cách phổ biến nhất để các container giao tiếp với nhau là cho chúng cùng tham gia một user-defined bridge hoặc overlay network. Docker tích hợp DNS nội bộ, cho phép container gọi nhau bằng hostname hoặc service name, đặc biệt thuận tiện khi sử dụng Docker Compose hoặc Swarm.
+
+\subsubsection*{Use case điển hình}
+\begin{itemize}
+  \item Kiến trúc 3-tier: container \texttt{web} gọi \texttt{api}, \texttt{api} gọi \texttt{db} trong cùng một network nội bộ.
+  \item Kiến trúc microservices: nhiều service nhỏ trao đổi với nhau qua HTTP, gRPC hoặc message broker (Redis, RabbitMQ) trong cùng một mạng Docker.
+\end{itemize}
+
+\subsubsection*{Ưu điểm và nhược điểm}
+\textbf{Ưu điểm:}
+\begin{itemize}
+  \item Cho phép tách ứng dụng thành nhiều service nhỏ, mỗi service là một container độc lập, nhưng vẫn giao tiếp được thông qua virtual network.
+  \item Hỗ trợ service discovery qua DNS, không cần hard-code IP, chỉ cần dùng tên service.
+\end{itemize}
+
+\textbf{Nhược điểm:}
+\begin{itemize}
+  \item Khi số lượng service tăng, topology mạng trở nên phức tạp, việc debug giao tiếp giữa các container khó hơn.
+  \item Các lỗi như sai network, subnet trùng, sai hostname thường gây lỗi kết nối “khó đoán” nếu không quen dùng các lệnh kiểm tra mạng của Docker.
+\end{itemize}
+
+\subsubsection*{Thách thức cấu hình và troubleshooting}
+\begin{itemize}
+  \item Lỗi thường gặp: container không ping/resolve được container khác do không cùng network hoặc DNS chưa đúng; cần cho chúng tham gia chung một user-defined network và kiểm tra hostname.
+  \item Khi dùng nhiều loại network (bridge, overlay, macvlan) cùng lúc, việc route có thể rối; cần thường xuyên dùng \texttt{docker network ls} và \texttt{docker network inspect} để hiểu rõ topology.
+\end{itemize}
+
+\subsubsection*{Lưu ý bảo mật}
+\begin{itemize}
+  \item Mặc định, container trong cùng một network có thể trao đổi dữ liệu tự do; với dịch vụ nhạy cảm (như database), nên tách network và chỉ cho phép một số container truy cập.
+  \item Nếu attacker chiếm được một container trong cùng network, họ có thể sniff hoặc tấn công các container khác; do đó cần kết hợp với firewall, TLS, và nguyên tắc \textit{least privilege}.
+\end{itemize}
 
 \end{document}
 
