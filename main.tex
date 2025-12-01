@@ -475,6 +475,96 @@ Cách phổ biến nhất để các container giao tiếp với nhau là cho ch
 
 \section{Xây dựng ứng dụng phân bổ multi-container}
 
+
+\subsection{Mô tả chung}
+
+Hệ thống được thiết kế theo kiến trúc microservice, gồm hai dịch vụ độc lập:
+\begin{itemize}
+    \item \textbf{Gateway service}: cung cấp API hướng ra ngoài, lắng nghe tại cổng \texttt{8000}.
+    \item \textbf{ML Worker service}: đảm nhiệm việc suy luận mô hình phân loại ``cat/dog'', lắng nghe tại cổng \texttt{5000}.
+\end{itemize}
+
+Cả hai dịch vụ đều được xây dựng trên nền tảng \texttt{FastAPI} và chạy trong các container riêng biệt, giúp việc triển khai, nâng cấp và mở rộng trở nên linh hoạt và ít phụ thuộc lẫn nhau.
+
+\subsection{Kiến trúc và cơ chế giao tiếp}
+
+Kiến trúc hệ thống theo hướng tách biệt rõ ràng giữa lớp API và lớp xử lý mô hình:
+
+\begin{itemize}
+    \item \textbf{Gateway} không chứa logic mô hình, mà đóng vai trò ``cửa ngõ'':
+    \begin{itemize}
+        \item Tiếp nhận request từ client.
+        \item Điều phối request sang ML Worker.
+        \item Đo lường và ghi nhận độ trễ giao tiếp.
+    \end{itemize}
+    \item \textbf{ML Worker} tập trung vào phần \textit{inference}:
+    \begin{itemize}
+        \item Nhận request từ Gateway.
+        \item Thực hiện (hoặc mô phỏng) suy luận mô hình.
+        \item Trả về kết quả dự đoán cho Gateway.
+    \end{itemize}
+    \item Hai dịch vụ giao tiếp với nhau thông qua HTTP nội bộ, với URL của ML Worker được cấu hình bằng biến môi trường \texttt{ML\_WORKER\_URL}. Cách cấu hình này giúp dễ dàng thay đổi địa chỉ triển khai (local, Docker, Kubernetes, v.v.) mà không cần sửa mã nguồn.
+\end{itemize}
+
+\subsection{Luồng xử lý yêu cầu}
+
+Luồng xử lý chuẩn cho chức năng phân loại được mô tả như sau:
+
+\begin{enumerate}
+    \item Client gửi request \texttt{POST /classify} tới Gateway, kèm theo dữ liệu đầu vào cần phân loại (tuỳ vào cấu hình hiện tại).
+    \item Gateway thực hiện gọi bất đồng bộ (\textit{async}) tới endpoint \texttt{POST /predict} của ML Worker, đồng thời đo thời gian khứ hồi (\textit{round-trip time}) giữa hai dịch vụ.
+    \item Khi nhận được request \texttt{/predict}, ML Worker:
+    \begin{itemize}
+        \item Chờ khoảng 50\,ms để mô phỏng thời gian suy luận của mô hình.
+        \item Sinh ngẫu nhiên một nhãn ``cat'' hoặc ``dog'' cùng với độ tin cậy \texttt{confidence = 0.9}.
+        \item Trả về kết quả dạng JSON cho Gateway.
+    \end{itemize}
+    \item Gateway tổng hợp thông tin và trả kết quả cho client dưới dạng:
+    \begin{verbatim}
+{
+  "prediction": "<cat|dog>",
+  "remote_latency_ms": <thời_gian_ms>
+}
+    \end{verbatim}
+
+\end{enumerate}
+
+Ngoài ra, cả Gateway và ML Worker đều cung cấp endpoint \texttt{/health} để kiểm tra trạng thái hoạt động, hỗ trợ tích hợp với các hệ thống giám sát và cân bằng tải.
+
+\subsection{Đánh giá kiến trúc và hướng phát triển}
+
+\paragraph{Ưu điểm.}
+\begin{itemize}
+    \item Kiến trúc microservice rõ ràng, tách biệt trách nhiệm giữa lớp API và lớp mô hình.
+    \item Dễ dàng thay thế ML Worker mô phỏng bằng mô hình ML thực mà không ảnh hưởng tới Gateway.
+    \item Việc đóng gói bằng container giúp quy trình triển khai và nhân bản dịch vụ trở nên đơn giản, phù hợp với môi trường thực tế.
+    \item Hệ thống đã hỗ trợ đo đạc độ trễ giữa Gateway và ML Worker, phục vụ tốt cho mục tiêu đánh giá hiệu năng mạng.
+\end{itemize}
+
+\paragraph{Hạn chế.}
+\begin{itemize}
+    \item Phần inference hiện tại chỉ là mô phỏng, chưa xử lý dữ liệu đầu vào thực tế.
+    \item Chưa tích hợp các cơ chế bảo mật như xác thực, phân quyền hay mã hoá dữ liệu.
+    \item Xử lý lỗi còn đơn giản, chưa có chiến lược retry chi tiết, timeout tuỳ biến hoặc ghi log một cách hệ thống.
+\end{itemize}
+
+\paragraph{Hướng phát triển.}
+\begin{itemize}
+    \item Bổ sung payload đầu vào đầy đủ cho endpoint \texttt{/classify} và triển khai mô hình ML thực tế trong ML Worker.
+    \item Tích hợp cơ chế logging, monitoring (ví dụ: thu thập metric, log truy cập, cảnh báo khi dịch vụ lỗi).
+    \item Hỗ trợ nhiều worker khác nhau cho các nhiệm vụ phân loại khác (ví dụ: đa nhãn, nhiều domain), và cấu hình Gateway để định tuyến đến worker tương ứng.
+    \item Mở rộng các cơ chế bảo mật (auth, rate limiting, v.v.) cũng như chiến lược xử lý lỗi và phục hồi.
+\end{itemize}
+
+
+
+
+
+
+
+
+
+
 \section{Phân tích bảo mật container}
 
 \section{Monitoring và Observability}
