@@ -472,3 +472,31 @@ Cách phổ biến nhất để các container giao tiếp với nhau là cho ch
 
 \end{document}
 
+
+\section{Xây dựng ứng dụng phân bổ multi-container}
+
+\section{Phân tích bảo mật container}
+
+\section{Monitoring và Observability}
+
+\section{Phản ánh}
+
+Bài tập mạng này đã cung cấp một cái nhìn sâu sắc và toàn diện 
+về kiến trúc và cơ chế xử lý ứng dụng của Docker, vượt ra ngoài mức 
+độ triển khai cơ bản để đối mặt với các vấn đề vận hành và bảo mật thực tế.
+ Trong quá trình thực hiện, người làm bài đã phải thử nghiệm nhiều phương 
+ pháp chạy thử khác nhau, điều này giúp củng cố sự hiểu biết về vòng đời 
+ và cấu hình của container. Thách thức lớn nhất ban đầu tập trung vào việc
+  setup port và quản lý kết nối phức tạp giữa các container thông qua các
+   địa chỉ IP nội bộ, đòi hỏi sự nắm vững về mô hình mạng Docker để đảm bảo luồng dữ 
+liệu thông suốt. Sau khi hệ thống vận hành ổn định, bài tập đã chuyển 
+sang trọng tâm là đào sâu vào các vấn đề bảo mật, mở ra nhiều góc nhìn
+ mới mẻ. Cụ thể, yêu cầu bảo mật đặt ra là phải xử lý việc đặt tên IP và 
+ ẩn giấu thông tin port (Port Obscurity) để giảm thiểu rủi ro bị lộ cấu 
+ trúc mạng, đồng thời áp dụng mã hóa (encryption) cho tất cả các kết nối, đảm bảo tính bảo 
+ mật và toàn vẹn của dữ liệu truyền tải giữa các thành phần. Cuối cùng, bài tập còn mang lại cơ hội quý 
+ giá để làm việc với các công cụ giám sát và phân tích tiên tiến như Prometheus để theo dõi 
+ các chỉ số hiệu suất của container và Wireshark để thực hiện phân tích gói tin sâu, kiểm tra hiệu 
+ quả của việc mã hóa và gỡ lỗi mạng. Sự kết hợp giữa việc triển khai ứng dụng, khắc phục sự 
+ cố kết nối, áp dụng các biện pháp bảo mật nghiêm ngặt, và sử dụng công cụ giám sát chuyên nghiệp 
+ đã biến bài tập này thành một trải nghiệm thực hành phong phú và toàn diện trong lĩnh vực công nghệ container hiện đại.
