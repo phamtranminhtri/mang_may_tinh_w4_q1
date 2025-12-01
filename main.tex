@@ -1,0 +1,222 @@
+% FORMAT AND PACKAGES
+% {
+\documentclass[a4paper]{article}
+\usepackage{a4wide,amssymb,epsfig,latexsym,multicol,array,hhline,fancyhdr}
+\usepackage{vntex}
+\usepackage{amsmath}
+\usepackage{lastpage}
+\usepackage[lined,boxed,commentsnumbered]{algorithm2e}
+\usepackage{enumerate}
+\usepackage{xcolor}
+\usepackage{graphicx}							% Standard graphics package
+\usepackage{array}
+\usepackage{tabularx, caption}
+\usepackage{multirow}
+\usepackage{array} % để chỉnh cột
+\newcounter{rownum} % tạo counter
+\usepackage{multicol}
+\usepackage{rotating}
+\usepackage{graphics}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{epsfig}
+\usepackage{tikz}
+\usepackage{xfrac}
+\usepackage{bm}
+\usepackage{biblatex}
+\usepackage[colorlinks]{hyperref}
+% \usepackage[acronym,toc]{glossaries}
+% \usepackage[symbols,nogroupskip,nonumberlist]{glossaries-extra}
+\usepackage[
+ sort=none,% no sorting or indexing required
+ abbreviations,% create list of abbreviations
+ symbols,% create list of symbols
+ stylemods,style=list, % set the default glossary style
+ nogroupskip, nonumberlist, nomain
+]{glossaries-extra}
+\usepackage{float}
+
+% FORMATTING
+% {
+\DeclareMathOperator{\arccot}{arccot}
+\captionsetup[table]{name=Bảng}
+\captionsetup[figure]{name=Hình}
+\newenvironment{Description}{\list{}{%
+    \let\makelabel\descriptionlabel    % this comes from the original description environment
+    \setlength{\rightmargin}{\leftmargin}% this comes from the original quote environment
+    \setlength{\labelwidth}{0pt}%          this is new
+    }}{\endlist}
+
+\addbibresource{citations.bib}
+    
+\hypersetup{urlcolor=blue,linkcolor=black,citecolor=black,colorlinks=true} 
+\usetikzlibrary{arrows,snakes,backgrounds}
+\definecolor{mathblue}{RGB}{0,114,188}
+% \makeatletter  \def\m@th{\mathsurround\z@\color{mathblue}} \makeatother
+% \everymath{\color{mathblue}}
+% \setmathfont[Color=000000]{Arial}
+%\usepackage{pstcol} 								% PSTricks with the standard color package
+\newtheorem{theorem}{{\bf Theorem}}
+\newtheorem{property}{{\bf Property}}
+\newtheorem{proposition}{{\bf Proposition}}
+\newtheorem{corollary}[proposition]{{\bf Corollary}}
+\newtheorem{lemma}[proposition]{{\bf Lemma}}
+
+\AtBeginDocument{\renewcommand{\listfigurename}{Danh sách hình ảnh}}
+\AtBeginDocument{\renewcommand{\listtablename}{Danh sách bảng}}
+\AtBeginDocument{\renewcommand*\contentsname{Mục lục}}
+\AtBeginDocument{\renewcommand*\refname{References}}
+%\usepackage{fancyhdr}
+
+\setlength{\headheight}{40pt}
+\pagestyle{fancy}
+\fancyhead{} % clear all header fields
+\fancyhead[L]{
+ \begin{tabular}{rl}
+    \begin{picture}(25,15)(0,0)
+    \put(0,-8){\includegraphics[width=8mm, height=8mm]{01_logobachkhoasang.png}}
+    %\put(0,-8){\epsfig{width=10mm,figure=hcmut.eps}}
+   \end{picture}&
+	%\includegraphics[width=8mm, height=8mm]{hcmut.png} & %
+	\begin{tabular}{l}
+		\textbf{\bf \ttfamily Trường Đại học Bách khoa - ĐHQG-HCM}\\
+		\textbf{\bf \ttfamily Khoa Khoa học và Kỹ thuật Máy tính}
+	\end{tabular} 	
+ \end{tabular}
+}
+\fancyhead[R]{
+	\begin{tabular}{l}
+		\tiny \bf \\
+		\tiny \bf 
+	\end{tabular}  }
+\fancyfoot{} % clear all footer fields
+\fancyfoot[L]{\scriptsize \ttfamily Bài tập nhóm Mạng máy tính - Năm học 2025 - 2026}
+\fancyfoot[R]{\scriptsize \ttfamily Trang {\thepage}/\pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.3pt}
+\renewcommand{\footrulewidth}{0.3pt}
+
+\setcounter{secnumdepth}{4}
+\setcounter{tocdepth}{4}
+
+\makeatletter
+\newcounter {subsubsubsection}[subsubsection]
+\renewcommand\thesubsubsubsection{\thesubsubsection .\@alph\c@subsubsubsection}
+\newcommand\subsubsubsection{\@startsection{subsubsubsection}{4}{\z@}%
+                                     {-3.25ex\@plus -1ex \@minus -.2ex}%
+                                     {1.5ex \@plus .2ex}%
+                                     {\normalfont\normalsize\bfseries}}
+\newcommand*\l@subsubsubsection{\@dottedtocline{3}{10.0em}{4.1em}}
+\newcommand*{\subsubsubsectionmark}[1]{}
+% \def\m@th{\mathsurround\z@\color{mathblue}}
+\makeatother
+% }
+% }
+
+% ACRONYMS & SYMBOLS
+% {
+% \makeglossaries
+\setabbreviationstyle{long-short}
+% \newabbreviation{ode}{ODE}{(First-Order) Ordinary Differential Equation}
+% \newabbreviation{ivp}{IVP}{Initial-Value Problem}
+% \newabbreviation{lte}{LTE}{Local Truncation Error}
+% \newabbreviation{ds}{DS}{Dynamical System}
+\newabbreviation{fig}{Fig.}{Figure}
+\newabbreviation{tab}{Tab.}{Table}
+% \newabbreviation{sys}{Sys.}{System of Equations}
+% \newabbreviation{eq}{Eq.}{Equation}
+\newabbreviation{eg}{e.g.}{For Example}
+\newabbreviation{ie}{i.e.}{That Is}
+
+
+% \newabbreviation{ai}{AI}{Artificial Intelligence}
+% \newabbreviation{ml}{ML}{Machine Learning}
+% \newabbreviation{dl}{DL}{Deep Learning}
+% \newabbreviation{eda}{EDA}{Exploratory Data Analysis}
+% \newabbreviation{iid}{IID}{Independent and Identically Distributed}
+% \newabbreviation{knn}{KNN}{K-Nearest Neighbors}
+% \newabbreviation{svm}{SVM}{Support Vector Machine}
+% \newabbreviation{pca}{PCA}{Principal Component Analysis}
+% \newabbreviation{mlp}{MLP}{Multilayer Perceptron}
+% \newabbreviation{sgd}{SGD}{Stochastic Gradient Descent}
+% \newabbreviation{mse}{MSE}{Mean Squared Error}
+
+\usepackage{longtable}
+\newcommand{\rownumber}{\stepcounter{rownum}\arabic{rownum}}
+
+% \glsnoexpandfields
+\glsxtrnewsymbol[description = {Set of natural numbers}]{natural}{\ensuremath{\mathbb{N}}}
+\glsxtrnewsymbol[description = {Set of real numbers}]{real}{\ensuremath{\mathbb{R}}}
+\glsxtrnewsymbol[description = {Set of positive real numbers}]{real_positive}{\ensuremath{\mathbb{R}^+}}
+
+% }
+
+% DOCUMENT
+\begin{document}
+
+% TITLE PAGE
+\begin{titlepage}
+\begin{center}
+ĐẠI HỌC QUỐC GIA THÀNH PHỐ HỒ CHÍ MINH \\
+TRƯỜNG ĐẠI HỌC BÁCH KHOA \\
+KHOA KHOA HỌC VÀ KỸ THUẬT MÁY TÍNH
+\end{center}
+
+\vspace{1cm}
+
+\begin{figure}[h!]
+\begin{center}
+\includegraphics[width=3cm]{01_logobachkhoasang.png}
+\end{center}
+\end{figure}
+
+\vspace{1cm}
+
+
+\begin{center}
+\begin{tabular}{c}
+\multicolumn{1}{c}{\textbf{{\Large Lớp TN01 - Nhóm 8386}}}\\
+~~\\
+\hline
+\\
+\multicolumn{1}{l}{\textbf{{\Large Bài tập nhóm tuần 1 - bài 3}}}\\
+\\
+\textbf{\textit{{\Huge Mạng máy tính (CO3094)}}}\\
+\\
+\hline
+\end{tabular}
+\end{center}
+
+\vspace{1cm}
+\begin{center}
+\textbf{\textit{\Large ``Exploring Ngrok with Nginx – Core Principles, Technology, Use Cases, and Dual-Endpoint Demo''}}
+    
+\end{center}
+\vspace{2cm}
+
+\begin{table}[h]
+\centering
+    \begin{tabular}{rl}
+    \hspace{3 cm}\textbf{Giảng viên hướng dẫn}:
+    & Hoàng Lê Hải Thanh\\
+
+    & \\[10pt]
+    \textbf{Sinh viên thực hiện}: &  Lê Nguyễn Kim Khôi - 2311671 \emph{(\textbf{Nhóm trưởng})} \\
+    &  Bùi Ngọc Phúc - 2312665  \\
+    &  Phạm Trần Minh Trí - 2313622\\
+    &  Lê Trọng Thiện - 2313233\\
+    &  Nguyễn Công Minh - 2312080 \\
+    \end{tabular}
+\end{table}
+
+\begin{center}
+{\footnotesize THÀNH PHỐ HỒ CHÍ MINH, 10/2025}
+\end{center}
+\end{titlepage}
+
+\pagebreak
+\tableofcontents
+
+
+
+\end{document}
+
