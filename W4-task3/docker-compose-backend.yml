@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: backend
+    environment:
+      - BACKEND_ID=backend-1
+      - BACKEND_IP=${BACKEND_IP:-192.168.1.20}
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
