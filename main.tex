@@ -470,8 +470,6 @@ Cách phổ biến nhất để các container giao tiếp với nhau là cho ch
   \item Nếu attacker chiếm được một container trong cùng network, họ có thể sniff hoặc tấn công các container khác; do đó cần kết hợp với firewall, TLS, và nguyên tắc \textit{least privilege}.
 \end{itemize}
 
-\end{document}
-
 
 \section{Xây dựng ứng dụng phân bổ multi-container}
 
@@ -567,6 +565,83 @@ Ngoài ra, cả Gateway và ML Worker đều cung cấp endpoint \texttt{/health
 
 \section{Phân tích bảo mật container}
 
+% \section{Task 4 - Container Security Analysis}
+
+\subsection{Tổng quan về Đánh giá Bảo mật}
+Mục tiêu của phần này là đánh giá mức độ an toàn của hệ thống mạng Docker (Networking Setup) cho kiến trúc microservices gồm API Gateway và ML Worker. Quá trình đánh giá tập trung vào việc xác định các lỗ hổng trong cấu hình mạng mặc định, phân tích các vector tấn công tiềm năng và thực hiện kiểm thử xâm nhập thực tế.
+
+\subsection{Phân tích Rủi ro và Điểm yếu Mạng}
+
+\subsubsection{Rủi ro của Exposed Ports và Default Bridge Network}
+Trong cấu hình mặc định, chúng tôi đã xác định các rủi ro nghiêm trọng sau:
+\begin{itemize}
+    \item \textbf{Exposed Ports:} Việc ánh xạ cổng của dịch vụ nội bộ (ML Worker) ra máy chủ vật lý (ví dụ: \texttt{-p 5000:5000}) tạo ra lỗ hổng Critical. Điều này cho phép kẻ tấn công truy cập trực tiếp vào worker, bỏ qua hoàn toàn lớp xác thực tại Gateway.
+    \item \textbf{Default Bridge Network:} Mạng cầu nối mặc định của Docker không cung cấp tính năng phân giải DNS tự động và quan trọng hơn là thiếu sự cô lập (isolation). Tất cả các container trên mạng này có thể giao tiếp tự do với nhau, tạo điều kiện cho tấn công leo thang (lateral movement).
+\end{itemize}
+
+\subsubsection{Điểm yếu trong Overlay và MACVLAN Networks}
+\begin{itemize}
+    \item \textbf{Overlay Networks:} Mặc dù hỗ trợ đa máy chủ (Swarm), mạng Overlay mặc định không mã hóa lưu lượng (VXLAN traffic), yêu cầu quản lý khóa phức tạp và mở thêm các cổng quản lý (2377, 7946, 4789), làm tăng bề mặt tấn công.
+    \item \textbf{MACVLAN Networks:} Cung cấp hiệu năng cao nhưng gặp vấn đề về cạn kiệt địa chỉ MAC (MAC address exhaustion) và yêu cầu chế độ promiscuous trên card mạng vật lý, điều này thường bị cấm trong môi trường Cloud hoặc Enterprise nghiêm ngặt.
+\end{itemize}
+
+\subsection{Các Kịch bản Tấn công Tiềm năng}
+
+\begin{enumerate}
+    \item \textbf{ARP Spoofing (Man-in-the-Middle):} Kẻ tấn công chiếm quyền kiểm soát một container trong cùng mạng có thể giả mạo gói tin ARP để chuyển hướng lưu lượng giữa Gateway và Worker qua máy của chúng nhằm đánh cắp dữ liệu.
+    \item \textbf{Network Sniffing:} Do giao tiếp giữa các container mặc định là HTTP (plaintext), kẻ tấn công có thể sử dụng \texttt{tcpdump} để bắt gói tin và đọc toàn bộ nội dung nhạy cảm.
+    \item \textbf{Misconfiguration Exploitation:} Lợi dụng việc cấu hình sai (như expose port nội bộ), kẻ tấn công có thể thực hiện DoS hoặc khai thác lỗ hổng ứng dụng trực tiếp từ internet.
+\end{enumerate}
+
+\subsection{Kết quả Kiểm thử Bảo mật Thực hành (Hands-on Security Tests)}
+
+Chúng tôi đã thực hiện 3 bài kiểm tra bảo mật thực tế trên môi trường \texttt{test-net}.
+
+\subsubsection{Test 1: Port Scanning từ Container nội bộ}
+\textbf{Mục tiêu:} Kiểm tra khả năng khám phá dịch vụ (Service Discovery) của kẻ tấn công.
+\textbf{Thực hiện:} Sử dụng công cụ \texttt{nmap} từ một container Alpine độc hại.
+\textbf{Kết quả:}
+\begin{verbatim}
+Nmap scan report for ml-worker (172.21.0.2)
+PORT     STATE SERVICE
+5000/tcp open  upnp
+\end{verbatim}
+\textbf{Đánh giá:} Kẻ tấn công có thể lập bản đồ toàn bộ hệ thống mạng trong vòng chưa đầy 1 giây do thiếu các quy tắc tường lửa nội bộ.
+
+\subsubsection{Test 2: Network Packet Capture (Sniffing)}
+\textbf{Mục tiêu:} Chứng minh rủi ro của việc truyền tải dữ liệu không mã hóa.
+\textbf{Thực hiện:} Sử dụng container \texttt{netshoot} chạy \texttt{tcpdump} để bắt gói tin giữa Gateway và Worker.
+\textbf{Kết quả:} Bắt được toàn bộ payload JSON dưới dạng plaintext:
+\begin{verbatim}
+POST /predict HTTP/1.1
+Host: ml-worker:5000
+...
+HTTP/1.1 200 OK
+{"class":"dog","confidence":0.8386}
+\end{verbatim}
+\textbf{Đánh giá:} \textbf{CRITICAL}. Dữ liệu dự đoán và thông tin nghiệp vụ bị lộ hoàn toàn. Vi phạm các tiêu chuẩn bảo mật như PCI-DSS và GDPR.
+
+\subsubsection{Test 3: Mô phỏng Misconfiguration (Exposed Internal Port)}
+\textbf{Mục tiêu:} Giả lập lỗi cấu hình phổ biến khi developer expose port của backend service.
+\textbf{Thực hiện:} Chạy worker với flag \texttt{-p 5000:5000} và thử truy cập trực tiếp bỏ qua Gateway.
+\textbf{Lệnh tấn công:} \texttt{curl -X POST http://localhost:5000/predict}
+\textbf{Kết quả:} Truy cập thành công và nhận được kết quả dự đoán mà không cần xác thực qua Gateway.
+\textbf{Đánh giá:} Lỗ hổng này phá vỡ hoàn toàn kiến trúc bảo mật phân tầng.
+
+\subsection{Giải pháp Bảo mật Đề xuất}
+
+Dựa trên kết quả đánh giá, các biện pháp sau cần được áp dụng:
+
+\begin{enumerate}
+    \item \textbf{Mã hóa đường truyền (TLS/mTLS):} Triển khai Mutual TLS để mã hóa giao tiếp giữa Gateway và Worker, ngăn chặn Sniffing và Spoofing.
+    \item \textbf{Phân đoạn mạng (Network Segmentation):} Tách biệt mạng Frontend (Public) và Backend (Internal). Worker chỉ nên nằm trong mạng Backend và không được expose port ra host.
+    \item \textbf{Access Control \& Firewalls:} Sử dụng \texttt{iptables} hoặc Docker Network Policies để chỉ cho phép Gateway giao tiếp với Worker trên cổng 5000, chặn tất cả các kết nối khác.
+    \item \textbf{Least Privilege:} Chạy container với user non-root và hạn chế quyền (drop capabilities) như trong file \texttt{Dockerfile.worker.secure}.
+\end{enumerate}
+
+\subsection{Kết luận}
+Hệ thống hiện tại tồn tại các lỗ hổng nghiêm trọng về cấu hình mạng và thiếu mã hóa. Việc áp dụng các biện pháp "Defense in Depth" như phân đoạn mạng và mTLS là bắt buộc trước khi triển khai lên môi trường Production.
+
 \section{Monitoring và Observability}
 
 \section{Phản ánh}
@@ -590,3 +665,5 @@ sang trọng tâm là đào sâu vào các vấn đề bảo mật, mở ra nhi�
  quả của việc mã hóa và gỡ lỗi mạng. Sự kết hợp giữa việc triển khai ứng dụng, khắc phục sự 
  cố kết nối, áp dụng các biện pháp bảo mật nghiêm ngặt, và sử dụng công cụ giám sát chuyên nghiệp 
  đã biến bài tập này thành một trải nghiệm thực hành phong phú và toàn diện trong lĩnh vực công nghệ container hiện đại.
+
+\end{document}
